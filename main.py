@@ -6,6 +6,7 @@ import time
 import os
 import zipfile
 
+
 class BackupDatabase:
     def __init__(self, config_path='config.ini'):
         self.config = self.cargar_configuracion(config_path)
@@ -16,14 +17,15 @@ class BackupDatabase:
         if 'config' in config:
             return config['config']
         else:
-            print("Sección de configuración 'config' no encontrada en el archivo de configuración.")
+            print(
+                "Sección de configuración 'config' no encontrada en el archivo de configuración.")
             sys.exit(1)
 
     def conectar_bd(self):
         try:
             conn_string = f"DRIVER={{SQL Server}};SERVER={self.config['server']};" \
-                          f"DATABASE={self.config['database']};USER={self.config['user']};" \
-                          f"PASSWORD={self.config['password']};"
+                f"DATABASE={self.config['database']};USER={self.config['user']};" \
+                f"PASSWORD={self.config['password']};"
             conn = pyodbc.connect(conn_string, autocommit=True)
             print("Conexión exitosa a la base de datos")
             return conn
@@ -53,7 +55,8 @@ class BackupDatabase:
                 print(f"¡Archivo {nombre_archivo} encontrado!")
                 try:
                     if BackupDatabase.comprimir_archivo(ruta_archivo, ruta_comprimido, tiempo_max_espera):
-                        BackupDatabase.eliminar_archivo_bak(ruta_archivo)  # Llamar al método para eliminar el .bak
+                        # Llamar al método para eliminar el .bak
+                        BackupDatabase.eliminar_archivo_bak(ruta_archivo)
                         return True
                     else:
                         return False
@@ -63,7 +66,8 @@ class BackupDatabase:
             else:
                 time.sleep(5)
 
-        print(f"Error: No se encontró el archivo {nombre_archivo} después de esperar.")
+        print(f"Error: No se encontró el archivo {
+              nombre_archivo} después de esperar.")
         return False
 
     @staticmethod
@@ -74,8 +78,10 @@ class BackupDatabase:
         while (time.time() - inicio) < tiempo_max_espera:
             try:
                 with zipfile.ZipFile(nombre_archivo_zip, 'w', zipfile.ZIP_DEFLATED) as archivo_zip:
-                    archivo_zip.write(archivo_a_comprimir, arcname=os.path.basename(archivo_a_comprimir))
-                print(f"Archivo comprimido exitosamente en {nombre_archivo_zip}")
+                    archivo_zip.write(
+                        archivo_a_comprimir, arcname=os.path.basename(archivo_a_comprimir))
+                print(f"Archivo comprimido exitosamente en {
+                      nombre_archivo_zip}")
                 exito = True  # Marcar como exitoso
                 break  # Salir del bucle si la compresión fue exitosa
             except PermissionError as e:
@@ -92,7 +98,6 @@ class BackupDatabase:
             print("No se pudo comprimir el archivo después del tiempo máximo de espera.")
             return False
 
-
     @staticmethod
     def crear_directorio_si_no_existe(ruta_directorio):
         if not os.path.exists(ruta_directorio):
@@ -103,7 +108,7 @@ class BackupDatabase:
                 print(f"Error al crear el directorio {ruta_directorio}: {e}")
                 return False
         return True  # El directorio ya existe
-    
+
     @staticmethod
     def eliminar_archivo_bak(ruta_archivo):
         try:
@@ -113,6 +118,7 @@ class BackupDatabase:
             print(f"No se pudo eliminar el archivo {ruta_archivo}: {e}")
 
     def realizar_copia_de_seguridad(self):
+        os.system('cls')
         if not self.crear_directorio_si_no_existe(self.config['ruta_archivo']):
             print("Error al preparar el directorio de copias de seguridad.")
             return
@@ -127,12 +133,14 @@ class BackupDatabase:
 
         try:
             query_backup = f"BACKUP DATABASE {self.config['database']} TO DISK = " \
-                           f"'{self.config['ruta_archivo']}{archivo_backup}.bak' WITH INIT"
+                f"'{self.config['ruta_archivo']}{
+                    archivo_backup}.bak' WITH INIT"
             cursor.execute(query_backup)
             print("Consulta de copia de seguridad ejecutada, esperando por el archivo...")
 
             if not self.esperar_archivo_bak(self.config['ruta_archivo'], archivo_backup, float(self.config['tiempo_max'])):
-                print("Error al realizar la copia de seguridad: No se encontró el archivo .bak después de esperar.")
+                print(
+                    "Error al realizar la copia de seguridad: No se encontró el archivo .bak después de esperar.")
                 return
             print(f"Copia de seguridad realizada con éxito: {archivo_backup}")
         except Exception as ex:
