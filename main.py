@@ -119,6 +119,7 @@ class BackupDatabase:
 
     def realizar_copia_de_seguridad(self):
         os.system('cls')
+        print("Backup V0.5")
         if not self.crear_directorio_si_no_existe(self.config['ruta_archivo']):
             print("Error al preparar el directorio de copias de seguridad.")
             return
