@@ -5,7 +5,9 @@ from datetime import datetime
 import time
 import os
 import zipfile
-
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 class BackupDatabase:
     def __init__(self, config_path='config.ini'):
@@ -23,9 +25,7 @@ class BackupDatabase:
 
     def conectar_bd(self):
         try:
-            conn_string = f"DRIVER={{SQL Server}};SERVER={self.config['server']};" \
-                f"DATABASE={self.config['database']};USER={self.config['user']};" \
-                f"PASSWORD={self.config['password']};"
+            conn_string = f"DRIVER={{SQL Server}};SERVER={self.config['server']};DATABASE={self.config['database']};"
             conn = pyodbc.connect(conn_string, autocommit=True)
             print("Conexión exitosa a la base de datos")
             return conn
@@ -117,6 +117,26 @@ class BackupDatabase:
         except Exception as e:
             print(f"No se pudo eliminar el archivo {ruta_archivo}: {e}")
 
+    def subir_a_google_drive(self, ruta_archivo_zip, nombre_archivo_zip):
+        try:
+            # Configuración de la API de Google Drive
+            creds = None
+            SCOPES = ['https://www.googleapis.com/auth/drive.file']
+            flow = InstalledAppFlow.from_client_secrets_file('./key.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+
+            # Inicializar el servicio de Google Drive
+            service = build('drive', 'v3', credentials=creds)
+
+            # Subir el archivo .zip a Google Drive
+            file_metadata = {'name': nombre_archivo_zip}
+            media = MediaFileUpload(ruta_archivo_zip, mimetype='application/zip')
+            file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+            print(f"Archivo subido exitosamente a Google Drive con el ID: {file.get('id')}")
+        except Exception as e:
+            print(f"Error al subir el archivo a Google Drive: {e}")
+
     def realizar_copia_de_seguridad(self):
         os.system('cls')
         print("Backup V0.5")
@@ -144,6 +164,15 @@ class BackupDatabase:
                     "Error al realizar la copia de seguridad: No se encontró el archivo .bak después de esperar.")
                 return
             print(f"Copia de seguridad realizada con éxito: {archivo_backup}")
+            # Ruta al archivo .bak
+            ruta_archivo_bak = os.path.join(self.config['ruta_archivo'], archivo_backup + ".bak")
+
+            # Comprimir el archivo .bak a .zip
+            ruta_archivo_zip = os.path.join(self.config['ruta_archivo'], archivo_backup + ".zip")
+            self.comprimir_archivo(ruta_archivo_bak, ruta_archivo_zip, float(self.config['tiempo_max']))
+
+            # Subir el archivo .zip a Google Drive
+            self.subir_a_google_drive(ruta_archivo_zip, archivo_backup + ".zip")
         except Exception as ex:
             print(f"Error al realizar la copia de seguridad: {ex}")
         finally:
