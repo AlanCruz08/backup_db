@@ -5,9 +5,6 @@ from datetime import datetime
 import time
 import os
 import zipfile
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
 
 class BackupDatabase:
     def __init__(self, config_path='config.ini'):
@@ -19,13 +16,12 @@ class BackupDatabase:
         if 'config' in config:
             return config['config']
         else:
-            print(
-                "Sección de configuración 'config' no encontrada en el archivo de configuración.")
+            print("Sección de configuración 'config' no encontrada en el archivo de configuración.")
             sys.exit(1)
 
     def conectar_bd(self):
         try:
-            conn_string = f"DRIVER={{SQL Server}};SERVER={self.config['server']};DATABASE={self.config['database']};"
+            conn_string = f"DRIVER={{SQL Server}};SERVER={self.config['server']}; DATABASE={self.config['database']};"
             conn = pyodbc.connect(conn_string, autocommit=True)
             print("Conexión exitosa a la base de datos")
             return conn
@@ -55,7 +51,6 @@ class BackupDatabase:
                 print(f"¡Archivo {nombre_archivo} encontrado!")
                 try:
                     if BackupDatabase.comprimir_archivo(ruta_archivo, ruta_comprimido, tiempo_max_espera):
-                        # Llamar al método para eliminar el .bak
                         BackupDatabase.eliminar_archivo_bak(ruta_archivo)
                         return True
                     else:
@@ -72,8 +67,8 @@ class BackupDatabase:
 
     @staticmethod
     def comprimir_archivo(archivo_a_comprimir, nombre_archivo_zip, tiempo_max_espera):
-        inicio = time.time()  # Guarda el tiempo de inicio
-        exito = False  # Para controlar si la compresión fue exitosa
+        inicio = time.time()
+        exito = False
 
         while (time.time() - inicio) < tiempo_max_espera:
             try:
@@ -82,15 +77,15 @@ class BackupDatabase:
                         archivo_a_comprimir, arcname=os.path.basename(archivo_a_comprimir))
                 print(f"Archivo comprimido exitosamente en {
                       nombre_archivo_zip}")
-                exito = True  # Marcar como exitoso
-                break  # Salir del bucle si la compresión fue exitosa
+                exito = True
+                break
             except PermissionError as e:
                 print(f"Error al intentar comprimir el archivo")
                 print(f"Reintentando en 5 segundos...")
-                time.sleep(5)  # Espera 5 segundos antes de reintentar
+                time.sleep(5)
             except Exception as e:
                 print(f"Error al comprimir el archivo: {e}")
-                break  # Salir del bucle si ocurre un error no manejado
+                break
 
         if exito:
             return True
@@ -107,7 +102,7 @@ class BackupDatabase:
             except Exception as e:
                 print(f"Error al crear el directorio {ruta_directorio}: {e}")
                 return False
-        return True  # El directorio ya existe
+        return True
 
     @staticmethod
     def eliminar_archivo_bak(ruta_archivo):
@@ -116,26 +111,6 @@ class BackupDatabase:
             print(f"Archivo {ruta_archivo} eliminado con éxito.")
         except Exception as e:
             print(f"No se pudo eliminar el archivo {ruta_archivo}: {e}")
-
-    def subir_a_google_drive(self, ruta_archivo_zip, nombre_archivo_zip):
-        try:
-            # Configuración de la API de Google Drive
-            creds = None
-            SCOPES = ['https://www.googleapis.com/auth/drive.file']
-            flow = InstalledAppFlow.from_client_secrets_file('./key.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-
-            # Inicializar el servicio de Google Drive
-            service = build('drive', 'v3', credentials=creds)
-
-            # Subir el archivo .zip a Google Drive
-            file_metadata = {'name': nombre_archivo_zip}
-            media = MediaFileUpload(ruta_archivo_zip, mimetype='application/zip')
-            file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-
-            print(f"Archivo subido exitosamente a Google Drive con el ID: {file.get('id')}")
-        except Exception as e:
-            print(f"Error al subir el archivo a Google Drive: {e}")
 
     def realizar_copia_de_seguridad(self):
         os.system('cls')
@@ -146,7 +121,7 @@ class BackupDatabase:
 
         conn = self.conectar_bd()
         if conn is None:
-            return  # Error de conexión ya manejado en conectar_bd
+            return
 
         cursor = conn.cursor()
         fecha_hora_actual = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
@@ -164,15 +139,7 @@ class BackupDatabase:
                     "Error al realizar la copia de seguridad: No se encontró el archivo .bak después de esperar.")
                 return
             print(f"Copia de seguridad realizada con éxito: {archivo_backup}")
-            # Ruta al archivo .bak
-            ruta_archivo_bak = os.path.join(self.config['ruta_archivo'], archivo_backup + ".bak")
 
-            # Comprimir el archivo .bak a .zip
-            ruta_archivo_zip = os.path.join(self.config['ruta_archivo'], archivo_backup + ".zip")
-            self.comprimir_archivo(ruta_archivo_bak, ruta_archivo_zip, float(self.config['tiempo_max']))
-
-            # Subir el archivo .zip a Google Drive
-            self.subir_a_google_drive(ruta_archivo_zip, archivo_backup + ".zip")
         except Exception as ex:
             print(f"Error al realizar la copia de seguridad: {ex}")
         finally:
