@@ -72,6 +72,7 @@ class BackupDatabase:
 
         while (time.time() - inicio) < tiempo_max_espera:
             try:
+                print(f"Comprimiendo archivo...")
                 with zipfile.ZipFile(nombre_archivo_zip, 'w', zipfile.ZIP_DEFLATED) as archivo_zip:
                     archivo_zip.write(
                         archivo_a_comprimir, arcname=os.path.basename(archivo_a_comprimir))
@@ -131,8 +132,8 @@ class BackupDatabase:
             query_backup = f"BACKUP DATABASE {self.config['database']} TO DISK = " \
                 f"'{self.config['ruta_archivo']}{
                     archivo_backup}.bak' WITH INIT"
+            print("Consulta de copia de seguridad ejecutandose..")
             cursor.execute(query_backup)
-            print("Consulta de copia de seguridad ejecutada, esperando por el archivo...")
 
             if not self.esperar_archivo_bak(self.config['ruta_archivo'], archivo_backup, float(self.config['tiempo_max'])):
                 print(
