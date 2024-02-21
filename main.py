@@ -19,14 +19,14 @@ class BackupDatabase:
             print("Sección de configuración 'config' no encontrada en el archivo de configuración.")
             sys.exit(1)
 
-    def conectar_bd(self):
+    def conectar_bd(self, db_name):
         try:
-            conn_string = f"DRIVER={{SQL Server}};SERVER={self.config['server']}; DATABASE={self.config['database']};"
+            conn_string = f"DRIVER={{SQL Server}};SERVER={self.config['server']}; DATABASE={db_name};"
             conn = pyodbc.connect(conn_string, autocommit=True)
-            print("Conexión exitosa a la base de datos")
+            print(f"Conexión exitosa a la base de datos {db_name}")
             return conn
         except Exception as ex:
-            print(f"Error de conexión a la base de datos: {ex}")
+            print(f"Error de conexión a la base de datos {db_name}: {ex}")
             return None
 
     @staticmethod
@@ -61,8 +61,7 @@ class BackupDatabase:
             else:
                 time.sleep(5)
 
-        print(f"Error: No se encontró el archivo {
-              nombre_archivo} después de esperar.")
+        print(f"Error: No se encontró el archivo {nombre_archivo} después de esperar.")
         return False
 
     @staticmethod
@@ -74,15 +73,13 @@ class BackupDatabase:
             try:
                 print(f"Comprimiendo archivo...")
                 with zipfile.ZipFile(nombre_archivo_zip, 'w', zipfile.ZIP_DEFLATED) as archivo_zip:
-                    archivo_zip.write(
-                        archivo_a_comprimir, arcname=os.path.basename(archivo_a_comprimir))
-                print(f"Archivo comprimido exitosamente en {
-                      nombre_archivo_zip}")
+                    archivo_zip.write(archivo_a_comprimir, arcname=os.path.basename(archivo_a_comprimir))
+                print(f"Archivo comprimido exitosamente en {nombre_archivo_zip}")
                 exito = True
                 break
             except PermissionError as e:
-                print(f"Error al intentar comprimir el archivo")
-                print(f"Reintentando en 5 segundos...")
+                print("Error al intentar comprimir el archivo")
+                print("Reintentando en 5 segundos...")
                 time.sleep(5)
             except Exception as e:
                 print(f"Error al comprimir el archivo: {e}")
@@ -113,31 +110,26 @@ class BackupDatabase:
         except Exception as e:
             print(f"No se pudo eliminar el archivo {ruta_archivo}: {e}")
 
-    def realizar_copia_de_seguridad(self):
-        os.system('cls')
-        print("Backup V0.5")
+    def realizar_backup_bd(self, db_name):
         if not self.crear_directorio_si_no_existe(self.config['ruta_archivo']):
             print("Error al preparar el directorio de copias de seguridad.")
             return
 
-        conn = self.conectar_bd()
+        conn = self.conectar_bd(db_name)
         if conn is None:
             return
 
         cursor = conn.cursor()
         fecha_hora_actual = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        archivo_backup = f"{self.config['nombre_pv']}_{fecha_hora_actual}"
+        archivo_backup = f"{self.config['nombre_pv']}_{db_name}_{fecha_hora_actual}"
 
         try:
-            query_backup = f"BACKUP DATABASE {self.config['database']} TO DISK = " \
-                f"'{self.config['ruta_archivo']}{
-                    archivo_backup}.bak' WITH INIT"
+            query_backup = f"BACKUP DATABASE {db_name} TO DISK = '{self.config['ruta_archivo']}{archivo_backup}.bak' WITH INIT"
             print("Consulta de copia de seguridad ejecutandose..")
             cursor.execute(query_backup)
 
             if not self.esperar_archivo_bak(self.config['ruta_archivo'], archivo_backup, float(self.config['tiempo_max'])):
-                print(
-                    "Error al realizar la copia de seguridad: No se encontró el archivo .bak después de esperar.")
+                print("Error al realizar la copia de seguridad: No se encontró el archivo .bak después de esperar.")
                 return
             print(f"Copia de seguridad realizada con éxito: {archivo_backup}")
 
@@ -146,6 +138,18 @@ class BackupDatabase:
         finally:
             self.cerrar_conexion(conn, cursor)
 
+    def realizar_copia_de_seguridad(self):
+        os.system('cls')
+        print("Backup V0.5")
+
+        # Backup de la primera base de datos
+        self.realizar_backup_bd(self.config['database'])
+        
+        # Backup de la segunda base de datos
+        if 'database2' in self.config:
+            self.realizar_backup_bd(self.config['database2'])
+        else:
+            print("La configuración para 'database2' no se encontró.")
 
 if __name__ == "__main__":
     backup_db = BackupDatabase()
