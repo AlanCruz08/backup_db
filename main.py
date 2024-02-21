@@ -140,7 +140,7 @@ class BackupDatabase:
 
     def realizar_copia_de_seguridad(self):
         os.system('cls')
-        print("Backup V0.5")
+        print("Backup V0.5.1")
 
         # Backup de la primera base de datos
         self.realizar_backup_bd(self.config['database'])
