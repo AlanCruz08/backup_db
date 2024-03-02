@@ -19,6 +19,7 @@ from googleapiclient.errors import HttpError
 class BackupDatabase:
     def __init__(self, config_path='config.ini'):
         self.config = self.cargar_configuracion(config_path)
+        self.eliminar = True
 
     def cargar_configuracion(self, path):
         config = configparser.ConfigParser()
@@ -201,7 +202,6 @@ class BackupDatabase:
                 token.write(creds.to_json())
 
         try:
-            eliminar = True
             service = build('drive', 'v3', credentials=creds)
             print("Conexión exitosa a Google Drive.")
 
@@ -238,14 +238,6 @@ class BackupDatabase:
             print(f"Error al conectar con Google Drive: {e}")
             eliminar = False
 
-        if eliminar:
-            time.sleep(30)
-            for file in os.listdir(ruta_archivo):
-                self.eliminar_archivo(f"{ruta_archivo}/{file}")
-        else:
-            print("No se eliminaron los archivos de la carpeta local.")
-
-
     def realizar_copia_de_seguridad(self):
         os.system('cls')
         print("Backup V0.5.3")
@@ -258,6 +250,13 @@ class BackupDatabase:
             self.realizar_backup_bd(self.config['database2'])
         else:
             print("La configuración para 'database2' no se encontró.")
+
+        if self.eliminar:
+            time.sleep(30)
+            for file in os.listdir(self.config['ruta_archivo']):
+                self.eliminar_archivo(f"{self.config['ruta_archivo']}/{file}")
+        else:
+            print("No se eliminaron los archivos de la carpeta local.")
 
 if __name__ == "__main__":
     backup_db = BackupDatabase()
