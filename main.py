@@ -232,11 +232,11 @@ class BackupDatabase:
                     archivos_eliminar.append(file)
                 except Exception as e:
                     print(f"Error al subir el archivo {file} a Google Drive: {e}")
-                    eliminar = False
+                    self.eliminar = False
             
         except HttpError as e:
             print(f"Error al conectar con Google Drive: {e}")
-            eliminar = False
+            self.eliminar = False
 
     def realizar_copia_de_seguridad(self):
         os.system('cls')
