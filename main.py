@@ -258,6 +258,8 @@ class BackupDatabase:
         else:
             print("No se eliminaron los archivos de la carpeta local.")
 
+        time.sleep(10)
+
 if __name__ == "__main__":
     backup_db = BackupDatabase()
     backup_db.realizar_copia_de_seguridad()
