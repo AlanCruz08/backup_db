@@ -252,7 +252,6 @@ class BackupDatabase:
             print("La configuración para 'database2' no se encontró.")
 
         if self.eliminar:
-            time.sleep(30)
             for file in os.listdir(self.config['ruta_archivo']):
                 self.eliminar_archivo(f"{self.config['ruta_archivo']}/{file}")
         else:
