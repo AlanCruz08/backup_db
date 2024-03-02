@@ -19,7 +19,7 @@ from googleapiclient.errors import HttpError
 class BackupDatabase:
     def __init__(self, config_path='config.ini'):
         self.config = self.cargar_configuracion(config_path)
-        self.eliminar = True
+        self.eliminar = True # Variable para saber si se eliminaron los archivos de la carpeta local
 
     def cargar_configuracion(self, path):
         config = configparser.ConfigParser()
@@ -50,8 +50,8 @@ class BackupDatabase:
 
     @staticmethod
     def esperar_archivo_bak(ruta, nombre_archivo, tiempo_max_espera=600):
-        ruta_archivo = os.path.join(ruta, nombre_archivo + ".bak")
-        ruta_comprimido = os.path.join(ruta, nombre_archivo + ".zip")
+        ruta_archivo = os.path.join(ruta, f"{nombre_archivo}.bak")
+        ruta_comprimido = os.path.join(ruta, f"{nombre_archivo}.zip")
         print(f"Buscando archivo: {ruta_archivo}")
 
         tiempo_inicial = time.time()
@@ -116,7 +116,7 @@ class BackupDatabase:
     @staticmethod
     def eliminar_archivo(ruta_archivo):
         max_intentos = 5
-        espera_entre_intentos = 2  # segundos
+        espera_entre_intentos = 5  # segundos
         for intento in range(max_intentos):
             try:
                 if not BackupDatabase.archivo_en_uso(ruta_archivo):
@@ -175,9 +175,6 @@ class BackupDatabase:
                 print("Error al realizar la copia de seguridad: No se encontró el archivo .bak después de esperar.")
                 return
             print(f"Copia de seguridad realizada con éxito: {archivo_backup}")
-
-            # Subir el archivo a Google Drive
-            self.subir_archivo_a_google_drive(self.config['ruta_archivo'], self.config['nombre_pv'])
 
         except Exception as ex:
             print(f"Error al realizar la copia de seguridad: {ex}")
@@ -250,6 +247,9 @@ class BackupDatabase:
             self.realizar_backup_bd(self.config['database2'])
         else:
             print("La configuración para 'database2' no se encontró.")
+
+        # Subir el archivo a Google Drive
+        self.subir_archivo_a_google_drive(self.config['ruta_archivo'], self.config['nombre_pv'])
 
         if self.eliminar:
             for file in os.listdir(self.config['ruta_archivo']):
