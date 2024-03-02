@@ -1,2 +1,8 @@
 Backup/
 config.ini
+credentials.json
+key.json
+main.spec
+build/
+Manual/
+token.json

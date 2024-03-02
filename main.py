@@ -4,7 +4,17 @@ import sys
 from datetime import datetime
 import time
 import os
+import os.path
 import zipfile
+import psutil
+
+# Importaciones para Google Drive
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+from googleapiclient.errors import HttpError
 
 class BackupDatabase:
     def __init__(self, config_path='config.ini'):
@@ -51,7 +61,7 @@ class BackupDatabase:
                 print(f"¡Archivo {nombre_archivo} encontrado!")
                 try:
                     if BackupDatabase.comprimir_archivo(ruta_archivo, ruta_comprimido, tiempo_max_espera):
-                        BackupDatabase.eliminar_archivo_bak(ruta_archivo)
+                        BackupDatabase.eliminar_archivo(ruta_archivo)
                         return True
                     else:
                         return False
@@ -103,12 +113,44 @@ class BackupDatabase:
         return True
 
     @staticmethod
-    def eliminar_archivo_bak(ruta_archivo):
+    def eliminar_archivo(ruta_archivo):
+        max_intentos = 5
+        espera_entre_intentos = 2  # segundos
+        for intento in range(max_intentos):
+            try:
+                if not BackupDatabase.archivo_en_uso(ruta_archivo):
+                    os.remove(ruta_archivo)
+                    print(f"Archivo {ruta_archivo} eliminado con éxito.")
+                    break
+                else:
+                    print(f"No se pudo eliminar el archivo {ruta_archivo}: Está siendo utilizado por otro proceso.")
+                    if intento < max_intentos - 1:
+                        print(f"Reintentando en {espera_entre_intentos} segundos...")
+                        time.sleep(espera_entre_intentos)
+                    else:
+                        print("Se alcanzó el máximo número de intentos. No se pudo eliminar el archivo.")
+            except Exception as e:
+                print(f"No se pudo eliminar el archivo {ruta_archivo}: {e}")
+                if intento < max_intentos - 1:
+                    print(f"Reintentando en {espera_entre_intentos} segundos...")
+                    time.sleep(espera_entre_intentos)
+                else:
+                    print("Se alcanzó el máximo número de intentos. No se pudo eliminar el archivo.")
+
+    @staticmethod
+    def archivo_en_uso(ruta_archivo):
         try:
-            os.remove(ruta_archivo)
-            print(f"Archivo {ruta_archivo} eliminado con éxito.")
+            for proceso in psutil.process_iter(['pid', 'name']):
+                try:
+                    archivos_abiertos = proceso.open_files()
+                    for archivo_abierto in archivos_abiertos:
+                        if ruta_archivo.lower() == archivo_abierto.path.lower():
+                            return True
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
         except Exception as e:
-            print(f"No se pudo eliminar el archivo {ruta_archivo}: {e}")
+            print(f"Error al verificar si el archivo está en uso: {e}")
+        return False
 
     def realizar_backup_bd(self, db_name):
         if not self.crear_directorio_si_no_existe(self.config['ruta_archivo']):
@@ -133,14 +175,80 @@ class BackupDatabase:
                 return
             print(f"Copia de seguridad realizada con éxito: {archivo_backup}")
 
+            # Subir el archivo a Google Drive
+            self.subir_archivo_a_google_drive(self.config['ruta_archivo'], self.config['nombre_pv'])
+
         except Exception as ex:
             print(f"Error al realizar la copia de seguridad: {ex}")
         finally:
             self.cerrar_conexion(conn, cursor)
 
+    def subir_archivo_a_google_drive(self, ruta_archivo, nombre_pv):
+        SCOPES = ['https://www.googleapis.com/auth/drive']
+        creds = None
+
+        if os.path.exists('token.json'):
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+                creds = flow.run_local_server(port=0)
+
+            with open('token.json', 'w') as token:
+                token.write(creds.to_json())
+
+        try:
+            eliminar = True
+            service = build('drive', 'v3', credentials=creds)
+            print("Conexión exitosa a Google Drive.")
+
+            response = service.files().list(q=f"mimeType='application/vnd.google-apps.folder' and name='Backups/{nombre_pv}'", spaces='drive').execute()
+            if not response['files']:
+                file_metadata = {
+                    'name': f'Backups/{nombre_pv}',
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                file = service.files().create(body=file_metadata, fields='id').execute()
+
+                folder_id = file.get('id')
+            else:
+                folder_id = response['files'][0]['id']
+
+            archivos_eliminar = []
+            for file in os.listdir(ruta_archivo):
+                try:
+
+                    file_metadata = {
+                        "name": file,
+                        "parents": [folder_id]
+                    }
+                    media = MediaFileUpload(f"{ruta_archivo}/{file}")
+                    upload_file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+                    print(f"Archivo {file} subido exitosamente a Google Drive.")
+                    time.sleep(10)
+                    archivos_eliminar.append(file)
+                except Exception as e:
+                    print(f"Error al subir el archivo {file} a Google Drive: {e}")
+                    eliminar = False
+            
+        except HttpError as e:
+            print(f"Error al conectar con Google Drive: {e}")
+            eliminar = False
+
+        if eliminar:
+            time.sleep(30)
+            for file in os.listdir(ruta_archivo):
+                self.eliminar_archivo(f"{ruta_archivo}/{file}")
+        else:
+            print("No se eliminaron los archivos de la carpeta local.")
+
+
     def realizar_copia_de_seguridad(self):
         os.system('cls')
-        print("Backup V0.5.1")
+        print("Backup V0.5.3")
 
         # Backup de la primera base de datos
         self.realizar_backup_bd(self.config['database'])
